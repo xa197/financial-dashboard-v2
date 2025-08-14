@@ -10,3 +10,4 @@ bokeh
 matplotlib
 pandas-ta
 xgboost
+pytz

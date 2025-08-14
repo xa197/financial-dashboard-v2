@@ -1,0 +1,9 @@
+# Ignorer les données brutes
+data/
+
+# Ignorer le fichier de log des prédictions
+predictions_log.csv
+
+# Ignorer les caches de Python
+__pycache__/
+*.pyc
