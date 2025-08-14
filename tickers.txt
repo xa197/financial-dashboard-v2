@@ -1,18 +1,12 @@
-# ==================================
-# FICHIER DE CONFIGURATION DES ACTIFS
-# ==================================
-# Un ticker par ligne.
-# Les lignes vides et celles commençant par # sont ignorées.
-
-# -------- TECHNOLOGIE --------
+[TECHNOLOGIE & COMMUNICATION]
 AAPL
 MSFT
 GOOGL
 GOOG
 AMZN
 NVDA
-TSLA
 META
+TSLA
 AVGO
 ASML
 ADBE
@@ -27,20 +21,12 @@ TXN
 MU
 AMAT
 LRCX
+NFLX
+DIS
+VZ
+T
 
-# -------- CONSOMMATION CYCLIQUE & SERVICES --------
-AMZN
-TSLA
-HD
-MCD
-NKE
-SBUX
-LOW
-BKNG
-TGT
-CMG
-
-# -------- FINANCE --------
+[FINANCE & IMMOBILIER]
 JPM
 V
 MA
@@ -51,8 +37,12 @@ MS
 AXP
 BLK
 PYPL
+SQ
+COIN
+SPGI
+PLD
 
-# -------- SANTÉ --------
+[SANTÉ]
 UNH
 JNJ
 LLY
@@ -62,8 +52,26 @@ ABBV
 TMO
 DHR
 ABT
+BMY
+ISRG
+VRTX
 
-# -------- INDUSTRIE & BIENS D'ÉQUIPEMENT --------
+[CONSOMMATION & DISTRIBUTION]
+HD
+MCD
+NKE
+SBUX
+LOW
+BKNG
+TGT
+CMG
+WMT
+PG
+KO
+PEP
+COST
+
+[INDUSTRIE & AÉROSPATIALE]
 CAT
 BA
 HON
@@ -72,28 +80,28 @@ DE
 RTX
 LMT
 UPS
+FDX
 
-# -------- ÉNERGIE --------
+[ÉNERGIE & MATÉRIAUX]
 XOM
 CVX
-
-# -------- SERVICES PUBLICS & TÉLÉCOMS --------
-NEE
-VZ
-T
-
-# -------- MATÉRIAUX DE BASE --------
+SHEL
 LIN
+BHP
 
-# -------- CRYPTOMONNAIES --------
+[CRYPTOMONNAIES]
 BTC-USD
 ETH-USD
+BNB-USD
 SOL-USD
 XRP-USD
-BNB-USD
+USDC-USD
 ADA-USD
 DOGE-USD
 AVAX-USD
 DOT1-USD
 LINK-USD
 MATIC-USD
+SHIB-USD
+TRX-USD
+LTC-USD
