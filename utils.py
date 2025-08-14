@@ -10,6 +10,7 @@ def load_data(ticker):
     try:
         df = pd.read_csv(csv_path, index_col=0, parse_dates=True)
         df.index.name = 'Date'
+        # CETTE BOUCLE EST CRUCIALE
         for col in ['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume']:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')

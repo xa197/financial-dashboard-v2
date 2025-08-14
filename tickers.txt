@@ -1,0 +1,99 @@
+# ==================================
+# FICHIER DE CONFIGURATION DES ACTIFS
+# ==================================
+# Un ticker par ligne.
+# Les lignes vides et celles commençant par # sont ignorées.
+
+# -------- TECHNOLOGIE --------
+AAPL
+MSFT
+GOOGL
+GOOG
+AMZN
+NVDA
+TSLA
+META
+AVGO
+ASML
+ADBE
+CRM
+AMD
+INTC
+QCOM
+CSCO
+ORCL
+IBM
+TXN
+MU
+AMAT
+LRCX
+
+# -------- CONSOMMATION CYCLIQUE & SERVICES --------
+AMZN
+TSLA
+HD
+MCD
+NKE
+SBUX
+LOW
+BKNG
+TGT
+CMG
+
+# -------- FINANCE --------
+JPM
+V
+MA
+BAC
+WFC
+GS
+MS
+AXP
+BLK
+PYPL
+
+# -------- SANTÉ --------
+UNH
+JNJ
+LLY
+PFE
+MRK
+ABBV
+TMO
+DHR
+ABT
+
+# -------- INDUSTRIE & BIENS D'ÉQUIPEMENT --------
+CAT
+BA
+HON
+GE
+DE
+RTX
+LMT
+UPS
+
+# -------- ÉNERGIE --------
+XOM
+CVX
+
+# -------- SERVICES PUBLICS & TÉLÉCOMS --------
+NEE
+VZ
+T
+
+# -------- MATÉRIAUX DE BASE --------
+LIN
+
+# -------- CRYPTOMONNAIES --------
+BTC-USD
+ETH-USD
+SOL-USD
+XRP-USD
+BNB-USD
+ADA-USD
+DOGE-USD
+AVAX-USD
+DOT1-USD
+LINK-USD
+MATIC-USD
