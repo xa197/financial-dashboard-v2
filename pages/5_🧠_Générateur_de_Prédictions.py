@@ -3,105 +3,158 @@ import pandas as pd
 import numpy as np
 import xgboost as xgb
 import yfinance as yf
-from utils import get_available_tickers
+from utils import get_tickers_by_category
 import os
 from datetime import datetime
+import pandas_ta as ta
 
-st.set_page_config(layout="wide", page_title="Générateur de Prédictions IA")
-
-# --- PARAMÈTRES ---
+# --- Configuration et Constantes ---
+st.set_page_config(layout="wide", page_title="Prédictions IA")
 PREDICTIONS_LOG_FILE = "predictions_log.csv"
-HORIZONS_MINUTES = {"5 min": 5, "15 min": 15, "30 min": 30, "45 min": 45, "1 heure": 60}
-HORIZONS_HOURS = {"2h": 2, "8h": 8, "1j": 24, "2j": 48, "7j": 168, "14j": 336, "28j": 672}
+HORIZONS = {"Court Terme (2h)": 2, "Intraday (8h)": 8, "1 Jour": 24, "2 Jours": 48, "1 Semaine": 168}
+LOG_COLUMNS = [
+    "Timestamp", "Ticker", "Horizon", "Prix Actuel", "Prix Prédit", "Date Cible",
+    "Prix Réel", "Erreur (%)", "Direction Correcte", "Dans Marge 5%", "Dans Marge 10%",
+    "Statut", "SPY_RSI_au_lancement", "VIX_au_lancement"
+]
 
-# --- MOTEUR XGBOOST ---
-def create_features_manual(df):
-    df['hour'] = df.index.hour; df['minute'] = df.index.minute
+# --- Fonctions de Traitement de Données et de Modélisation (Mises en Cache) ---
+
+@st.cache_data(ttl=1800) # Cache de 30 minutes
+def get_hourly_data(ticker):
+    """Télécharge 60 jours de données horaires pour un ticker. Fonction sécurisée et cachée."""
+    try:
+        data = yf.download(ticker, period="60d", interval="1h", progress=False)
+        if data.empty:
+            return pd.DataFrame()
+        # S'assurer que l'index est un DatetimeIndex
+        if not isinstance(data.index, pd.DatetimeIndex):
+            data.index = pd.to_datetime(data.index)
+        return data
+    except Exception:
+        return pd.DataFrame()
+
+def create_features(df):
+    """Crée des features techniques pour le modèle."""
+    df['hour'] = df.index.hour
     df['dayofweek'] = df.index.dayofweek
-    delta = df['Close'].diff(); gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean(); rs = gain / loss
-    df['RSI_14'] = 100 - (100 / (1 + rs)); df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean()
-    df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
+    df.ta.rsi(length=14, append=True)
+    df.ta.ema(length=20, append=True)
+    df.ta.ema(length=50, append=True)
     return df
 
-@st.cache_data(ttl=60)
-def train_and_predict_xgboost(ticker, horizon_value, time_unit='minutes'):
-    if time_unit == 'minutes':
-        data = yf.download(ticker, period="7d", interval="1m", progress=False)
-        if data.empty:
-            data = yf.download(ticker, period="30d", interval="5m", progress=False)
-            if data.empty: return None, None
-            shift_periods = int(horizon_value / 5)
-        else:
-            shift_periods = int(horizon_value)
-    else: # hours
-        data = yf.download(ticker, period="730d", interval="1h", progress=False)
-        if data.empty: return None, None
-        shift_periods = int(horizon_value)
-
-    if isinstance(data.index, pd.MultiIndex): data.index = data.index.get_level_values('Datetime')
-    
-    data_with_features = create_features_manual(data.copy())
-    data_with_features['target'] = data_with_features['Close'].shift(-shift_periods)
-    data_with_features.dropna(inplace=True)
-
-    if len(data_with_features) < 50: return None, None
-    
-    FEATURES = ['hour', 'minute', 'dayofweek', 'RSI_14', 'EMA_20', 'EMA_50']
+def train_predict_model(df, horizon_hours):
+    """Entraîne un modèle XGBoost et retourne la prédiction sur les données les plus récentes."""
+    FEATURES = ['hour', 'dayofweek', 'RSI_14', 'EMA_20b', 'EMA_50b'] # Noms de colonnes de pandas_ta
     TARGET = 'target'
-    X, y = data_with_features[FEATURES], data_with_features[TARGET]
+    
+    df_features = create_features(df.copy())
+    df_features[TARGET] = df_features['Close'].shift(-horizon_hours)
+    df_features.dropna(inplace=True)
+    
+    if len(df_features) < 100: # Seuil de sécurité
+        return None
 
-    model = xgb.XGBRegressor(objective='reg:squarederror', n_estimators=100).fit(X, y)
-    latest_data_for_pred = create_features_manual(data.copy()).iloc[-1:]
-    latest_features = latest_data_for_pred[FEATURES].values
-    prediction = model.predict(latest_features)[0]
-    current_price = data['Close'].iloc[-1]
-    return float(prediction), float(current_price)
+    X, y = df_features[FEATURES], df_features[TARGET]
+    model = xgb.XGBRegressor(objective='reg:squarederror', n_estimators=100, random_state=42)
+    model.fit(X, y)
+    
+    # Prédiction sur la dernière ligne de données disponibles
+    latest_features = create_features(df.copy())[FEATURES].iloc[-1:].values
+    prediction = model.predict(latest_features)
+    return float(prediction[0])
 
-def log_prediction(log_file, timestamp, ticker, horizon_label, horizon_value, time_unit, predicted_price, current_price):
-    if time_unit == 'minutes': target_date = timestamp + pd.Timedelta(minutes=horizon_value)
-    else: target_date = timestamp + pd.Timedelta(hours=horizon_value)
-        
-    new_entry = pd.DataFrame([{"Timestamp": timestamp.strftime('%Y-%m-%d %H:%M:%S'),"Ticker": ticker,"Horizon": horizon_label,"Prix Actuel": current_price,"Prix Prédit": predicted_price,"Date Cible": target_date.strftime('%Y-%m-%d %H:%M:%S'),"Prix Réel": np.nan,"Erreur (%)": np.nan,"Statut": "En attente"}])
-    if not os.path.exists(log_file): new_entry.to_csv(log_file, index=False)
-    else: new_entry.to_csv(log_file, mode='a', header=False, index=False)
+@st.cache_data(ttl=3600) # Cache de 1 heure pour le contexte marché
+def get_market_context():
+    """Récupère des indicateurs sur l'état général du marché (S&P 500 et VIX)."""
+    try:
+        spy = yf.Ticker('^GSPC').history(period='3mo', auto_adjust=True)
+        vix = yf.Ticker('^VIX').history(period='3mo', auto_adjust=True)
+        spy_rsi = ta.rsi(spy['Close'], length=14).iloc[-1]
+        vix_value = vix['Close'].iloc[-1]
+        return spy_rsi, vix_value
+    except Exception:
+        return np.nan, np.nan
 
-# --- INTERFACE ---
-st.title("🧠 Prédictions & Scan par IA (XGBoost)")
-available_tickers = get_available_tickers()
+def log_prediction(timestamp, ticker, horizon_label, predicted_price, current_price):
+    """Enregistre une nouvelle prédiction dans le fichier de log CSV."""
+    spy_rsi, vix_value = get_market_context()
+    target_date = timestamp + pd.Timedelta(hours=HORIZONS[horizon_label])
+    
+    new_entry = {
+        "Timestamp": timestamp, "Ticker": ticker, "Horizon": horizon_label,
+        "Prix Actuel": current_price, "Prix Prédit": predicted_price,
+        "Date Cible": target_date, "Prix Réel": np.nan, "Erreur (%)": np.nan,
+        "Direction Correcte": pd.NA, "Dans Marge 5%": pd.NA, "Dans Marge 10%": pd.NA,
+        "Statut": "En attente", "SPY_RSI_au_lancement": spy_rsi, "VIX_au_lancement": vix_value
+    }
+    
+    try:
+        if not os.path.exists(PREDICTIONS_LOG_FILE):
+            pd.DataFrame([new_entry], columns=LOG_COLUMNS).to_csv(PREDICTIONS_LOG_FILE, index=False)
+        else:
+            pd.DataFrame([new_entry], columns=LOG_COLUMNS).to_csv(PREDICTIONS_LOG_FILE, mode='a', header=False, index=False)
+    except Exception as e:
+        st.error(f"Erreur lors de l'écriture dans le log : {e}")
 
-st.subheader("Analyse Rapide à la Demande")
-prediction_mode = st.radio("Choisissez le type d'horizon", ("Court Terme (minutes)", "Long Terme (heures/jours)"), horizontal=True)
+# --- Interface Streamlit ---
+st.title("🧠 Générateur de Prédictions par IA (XGBoost)")
+st.markdown("Scanne les actifs par secteur pour prédire les variations de prix à différents horizons.")
 
-if prediction_mode == "Court Terme (minutes)":
-    horizons_to_use = HORIZONS_MINUTES; time_unit = 'minutes'
+tickers_by_category = get_tickers_by_category()
+
+if not tickers_by_category or "ERREUR" in tickers_by_category:
+    st.error("Impossible de lire les catégories depuis `tickers.txt`.")
 else:
-    horizons_to_use = HORIZONS_HOURS; time_unit = 'hours'
+    category_tabs = st.tabs(list(tickers_by_category.keys()))
+    for i, category in enumerate(tickers_by_category):
+        with category_tabs[i]:
+            st.subheader(f"Actifs du secteur : {category}")
+            tickers_in_category = tickers_by_category[category]
+            
+            # Le scan se lance automatiquement dans chaque onglet
+            with st.spinner(f"Préparation des prédictions pour le secteur {category}..."):
+                prediction_time = datetime.now()
+                all_results = []
+                progress_bar = st.progress(0, text="Initialisation...")
 
-with st.form("quick_analysis_form"):
-    col1, col2, col3 = st.columns([2, 2, 1])
-    with col1:
-        quick_tickers = st.multiselect("Actifs à analyser", options=available_tickers, default=available_tickers[0] if available_tickers else None)
-    with col2:
-        quick_horizons = st.multiselect("Horizons de prédiction", options=list(horizons_to_use.keys()), default=list(horizons_to_use.keys()))
-    with col3:
-        submitted = st.form_submit_button("🚀 Lancer l'Analyse")
+                for j, ticker in enumerate(tickers_in_category):
+                    progress_bar.progress((j + 1) / len(tickers_in_category), text=f"Analyse de {ticker}...")
+                    
+                    hourly_data = get_hourly_data(ticker)
+                    
+                    if hourly_data.empty:
+                        continue # On passe au ticker suivant si pas de données
 
-if submitted and quick_tickers and quick_horizons:
-    st.write("---")
-    for ticker in quick_tickers:
-        st.write(f"**Analyse de {ticker}...**")
-        prediction_time = datetime.now()
-        cols = st.columns(len(quick_horizons) if quick_horizons else 1)
-        for i, horizon_label in enumerate(quick_horizons):
-            with cols[i]:
-                with st.spinner(f"{horizon_label}..."):
-                    horizon_value = horizons_to_use[horizon_label]
-                    predicted_price, current_price = train_and_predict_xgboost(ticker, horizon_value, time_unit)
-                    if predicted_price is not None:
-                        change_pct = ((predicted_price - current_price) / current_price) * 100
-                        st.metric(label=f"{horizon_label}", value=f"${predicted_price:,.2f}", delta=f"{change_pct:+.2f}%")
-                        log_prediction(PREDICTIONS_LOG_FILE, prediction_time, ticker, horizon_label, horizon_value, time_unit, predicted_price, current_price)
-                    else:
-                        st.warning("Échec")
-    st.success("Analyse rapide terminée et sauvegardée.")
+                    current_price = hourly_data['Close'].iloc[-1]
+                    result_row = {"Actif": ticker, "Prix Actuel": current_price}
+
+                    for horizon_label, horizon_h in HORIZONS.items():
+                        predicted_price = train_predict_model(hourly_data, horizon_h)
+                        
+                        if predicted_price is not None:
+                            change_pct = ((predicted_price - current_price) / current_price) * 100
+                            result_row[horizon_label] = change_pct
+                            log_prediction(prediction_time, ticker, horizon_label, predicted_price, current_price)
+                        else:
+                            result_row[horizon_label] = np.nan
+                    
+                    all_results.append(result_row)
+                
+                progress_bar.empty()
+
+            if all_results:
+                df_results = pd.DataFrame(all_results).set_index("Actif")
+                
+                # Formatage pour l'affichage
+                format_dict = {'Prix Actuel': '${:,.2f}'}
+                for col in df_results.columns:
+                    if col != 'Prix Actuel':
+                        format_dict[col] = '{:+.2f}%'
+                
+                st.dataframe(df_results.style.format(format_dict, na_rep="-").background_gradient(
+                    cmap='RdYlGn', 
+                    subset=[col for col in df_results.columns if col != 'Prix Actuel']
+                ), use_container_width=True)
+            else:
+                st.info("Aucune prédiction n'a pu être générée pour ce secteur.")

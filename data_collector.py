@@ -1,47 +1,69 @@
+# data_collector.py (Version Correcte et Finale)
+
 import yfinance as yf
 import pandas as pd
 import os
-import time
+import logging
 
-TICKER_FILE = "tickers.txt" 
-DATA_DIR = "data"
-START_DATE = "2018-01-01"
-END_DATE = pd.to_datetime('today').strftime('%Y-%m-%d')
+# --- Configuration du Logging ---
+logging.basicConfig(
+    filename='data_collector.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    filemode='w' # 'w' pour écraser le log à chaque lancement
+)
 
-def get_tickers_from_file(filepath):
-    """Lit le fichier tickers.txt et retourne une liste de tous les tickers."""
+def get_all_tickers(file_path='tickers.txt'):
+    """Lit le fichier tickers.txt et retourne une liste propre de tickers."""
     try:
-        with open(filepath, 'r') as f:
-            tickers = [
-                line.strip().upper() for line in f
-                if line.strip() and not line.strip().startswith(('#', '['))
-            ]
+        with open(file_path, 'r', encoding='utf-8') as f:
+            tickers = [line.strip().upper() for line in f if line.strip() and not line.startswith('[') and not line.startswith('#')]
         return tickers
     except FileNotFoundError:
+        logging.error(f"Le fichier de tickers '{file_path}' est introuvable.")
         return []
 
-# ... (Le reste du code de data_collector.py reste EXACTEMENT le même) ...
-# (Je ne le remets pas en entier pour ne pas alourdir, il n'y a que la fonction ci-dessus qui change)
-def collect_all_data():
-    tickers_to_download = get_tickers_from_file(TICKER_FILE)
-    if not tickers_to_download: print("Aucun ticker à télécharger."); return
-    print(f"{len(tickers_to_download)} tickers à télécharger.")
-    if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
-    success_count, error_count = 0, 0
-    for i, ticker in enumerate(tickers_to_download):
-        print(f"[{i+1}/{len(tickers_to_download)}] Téléchargement pour {ticker}...")
-        file_path = os.path.join(DATA_DIR, f"{ticker}.csv")
+def main():
+    """Script principal pour télécharger et sauvegarder les données."""
+    logging.info("--- Démarrage du collecteur de données ---")
+    
+    if not os.path.exists('data'):
+        os.makedirs('data')
+        logging.info("Dossier /data créé.")
+
+    tickers_to_download = get_all_tickers()
+    if not tickers_to_download:
+        logging.warning("Aucun ticker trouvé dans tickers.txt. Arrêt du script.")
+        return
+
+    logging.info(f"{len(tickers_to_download)} tickers à traiter.")
+    
+    success_count = 0
+    error_count = 0
+
+    for ticker in tickers_to_download:
         try:
-            data = yf.download(ticker, start=START_DATE, end=END_DATE, progress=False)
-            if not data.empty:
-                data.index.name = 'Date'
-                data.to_csv(file_path)
-                success_count += 1
-            else: error_count += 1
-            time.sleep(0.5)
+            data = yf.download(ticker, period="10y", interval="1d", progress=False)
+            
+            if data.empty:
+                logging.warning(f"Aucune donnée reçue pour {ticker}. Ignoré.")
+                error_count += 1
+                continue
+
+            # La sauvegarde correcte qui inclut l'index 'Date' comme première colonne
+            file_path = f"data/{ticker.upper()}.csv"
+            data.to_csv(file_path)
+            
+            logging.info(f"OK - Données pour {ticker} sauvegardées.")
+            success_count += 1
+
         except Exception as e:
-            print(f"  -> ERREUR: {e}"); error_count += 1
-    print(f"\n--- Collecte terminée ---\nSuccès: {success_count} | Échecs: {error_count}")
+            logging.error(f"ERREUR - Échec pour {ticker}: {e}")
+            error_count += 1
+
+    logging.info("--- Fin du cycle de collecte ---")
+    logging.info(f"Résumé : {success_count} succès, {error_count} échecs.")
 
 if __name__ == "__main__":
-    collect_all_data()
+    main()
