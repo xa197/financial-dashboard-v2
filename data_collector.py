@@ -1,4 +1,3 @@
-# data_collector.py (Version Correcte et Finale)
 
 import yfinance as yf
 import pandas as pd
@@ -28,9 +27,13 @@ def main():
     """Script principal pour télécharger et sauvegarder les données."""
     logging.info("--- Démarrage du collecteur de données ---")
     
-    if not os.path.exists('data'):
-        os.makedirs('data')
-        logging.info("Dossier /data créé.")
+    if os.path.exists('data'):
+        import shutil
+        shutil.rmtree('data')
+        logging.info("Ancien dossier /data supprimé.")
+    
+    os.makedirs('data')
+    logging.info("Nouveau dossier /data créé.")
 
     tickers_to_download = get_all_tickers()
     if not tickers_to_download:
