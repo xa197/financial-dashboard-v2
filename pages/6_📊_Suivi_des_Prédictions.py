@@ -1,3 +1,5 @@
+# pages/6_📊_Suivi_des_Prédictions.py (Version Finale Corrigée)
+
 import streamlit as st
 import pandas as pd
 import yfinance as yf
@@ -16,20 +18,23 @@ LOG_COLUMNS = [
 ]
 
 # --- Fonctions de Gestion des Fichiers (sécurisées) ---
+@st.cache_data
 def load_log():
-    """Charge le log des prédictions et s'assure qu'il est bien formaté."""
+    """Charge le log, le nettoie et standardise les fuseaux horaires."""
     if not os.path.exists(PREDICTIONS_LOG_FILE):
         return pd.DataFrame(columns=LOG_COLUMNS)
     try:
         df = pd.read_csv(PREDICTIONS_LOG_FILE)
-        # S'assurer que toutes les colonnes nécessaires existent
         for col in LOG_COLUMNS:
             if col not in df.columns:
                 df[col] = pd.NA
-        # Conversion robuste des colonnes de date
-        df['Timestamp'] = pd.to_datetime(df['Timestamp'], errors='coerce')
-        df['Date Cible'] = pd.to_datetime(df['Date Cible'], errors='coerce')
-        return df[LOG_COLUMNS] # Garantit l'ordre des colonnes
+        
+        # --- LA CORRECTION EST ICI ---
+        # On s'assure que les dates sont bien au format datetime et on leur assigne le fuseau UTC
+        df['Timestamp'] = pd.to_datetime(df['Timestamp'], errors='coerce').dt.tz_localize('UTC')
+        df['Date Cible'] = pd.to_datetime(df['Date Cible'], errors='coerce').dt.tz_localize('UTC')
+        
+        return df[LOG_COLUMNS]
     except Exception as e:
         st.error(f"Erreur de lecture du fichier log : {e}")
         return pd.DataFrame(columns=LOG_COLUMNS)
@@ -37,7 +42,13 @@ def load_log():
 def save_log(df):
     """Sauvegarde le log des prédictions dans le fichier CSV."""
     try:
-        df.to_csv(PREDICTIONS_LOG_FILE, index=False, date_format='%Y-%m-%d %H:%M:%S')
+        df_to_save = df.copy()
+        # On enlève les fuseaux horaires avant de sauvegarder pour un format standard
+        for col in ['Timestamp', 'Date Cible']:
+            if pd.api.types.is_datetime64_any_dtype(df_to_save[col]):
+                 df_to_save[col] = df_to_save[col].dt.tz_localize(None)
+        
+        df_to_save.to_csv(PREDICTIONS_LOG_FILE, index=False, date_format='%Y-%m-%d %H:%M:%S')
         return True
     except Exception as e:
         st.error(f"Impossible de sauvegarder le log : {e}")
@@ -45,11 +56,8 @@ def save_log(df):
 
 def update_predictions_log(df):
     """Met à jour les prédictions arrivées à échéance. Logique optimisée."""
-    utc = pytz.UTC
-    now_utc = datetime.now(utc)
+    now_utc = datetime.now(pytz.UTC)
     
-    # Localiser les colonnes de date en UTC pour une comparaison correcte
-    df['Date Cible'] = df['Date Cible'].dt.tz_localize(utc, ambiguous='infer')
     updates_needed = df[df['Statut'].eq('En attente') & df['Date Cible'].lt(now_utc)].copy()
 
     if updates_needed.empty:
@@ -60,16 +68,18 @@ def update_predictions_log(df):
 
     with st.status(f"Mise à jour de {len(updates_needed)} prédictions...", expanded=True) as status:
         for ticker in tickers_to_fetch:
-            st.write(f"Téléchargement des données pour **{ticker}**...")
+            status.update(label=f"Téléchargement des données pour **{ticker}**...")
             min_date = updates_needed[updates_needed['Ticker'] == ticker]['Date Cible'].min() - pd.Timedelta(days=1)
             max_date = updates_needed[updates_needed['Ticker'] == ticker]['Date Cible'].max() + pd.Timedelta(days=1)
             try:
-                data_cache[ticker] = yf.download(ticker, start=min_date, end=max_date, interval="1h", progress=False)
+                data = yf.download(ticker, start=min_date, end=max_date, interval="1h", progress=False)
+                if isinstance(data.columns, pd.MultiIndex):
+                     data.columns = [col[0] for col in data.columns]
+                data_cache[ticker] = data
             except Exception:
-                st.write(f"↳ Erreur de téléchargement pour {ticker}")
                 data_cache[ticker] = None
 
-        st.write("Évaluation des prédictions...")
+        status.update(label="Évaluation des prédictions...")
         for index, row in updates_needed.iterrows():
             ticker_data = data_cache.get(row['Ticker'])
             if ticker_data is None or ticker_data.empty:
@@ -78,16 +88,12 @@ def update_predictions_log(df):
             
             try:
                 target_date_utc = row['Date Cible']
-                # Trouver le prix à l'heure la plus proche dans les données téléchargées
                 closest_time_index = ticker_data.index.get_loc(target_date_utc, method='nearest')
                 real_price = ticker_data.iloc[closest_time_index]['Close']
-
-                # Calcul des métriques de performance
                 error_pct = ((real_price - row['Prix Prédit']) / row['Prix Actuel']) * 100
                 predicted_up = row['Prix Prédit'] > row['Prix Actuel']
                 real_up = real_price > row['Prix Actuel']
 
-                # Mise à jour du DataFrame principal
                 df.loc[index, 'Prix Réel'] = real_price
                 df.loc[index, 'Erreur (%)'] = error_pct
                 df.loc[index, 'Direction Correcte'] = (predicted_up == real_up)
@@ -113,20 +119,19 @@ if st.button(f"🚀 Mettre à jour les {pending_count} prédictions évaluables"
     updated_df, count = update_predictions_log(df_log.copy())
     if count > 0:
         if save_log(updated_df):
-            st.session_state.predictions_log = updated_df
+            st.session_state.predictions_log = load_log() # On recharge depuis le fichier pour être sûr
             st.success(f"{count} prédictions ont été mises à jour et sauvegardées.")
             st.rerun()
     else:
         st.info("Aucune nouvelle prédiction à évaluer pour le moment.")
 
 if df_log.empty:
-    st.warning("Aucun log de prédictions trouvé. Veuillez en générer depuis la page 'Générateur de Prédictions IA'.")
+    st.warning("Aucun log de prédictions trouvé.")
 else:
     completed = df_log[df_log['Statut'] == 'Évaluée'].copy()
     
     st.subheader("Indicateurs de Performance Globaux")
     if not completed.empty:
-        # Conversion en booléens pour des calculs fiables
         for col in ['Direction Correcte', 'Dans Marge 5%', 'Dans Marge 10%']:
             completed[col] = pd.to_numeric(completed[col], errors='coerce').astype(bool)
 
@@ -140,16 +145,14 @@ else:
         col3.metric("Dans Marge de 5%", f"{margin_5_success:.1f}%")
         col4.metric("Dans Marge de 10%", f"{margin_10_success:.1f}%")
 
-        # Visualisation de la performance par horizon
         st.subheader("Performance par Horizon de Prédiction")
-        perf_by_horizon = completed.groupby('Horizon')['Direction Correcte'].mean().mul(100).sort_index()
-        fig = px.bar(perf_by_horizon, title="Taux de Succès de la Direction par Horizon",
-                     labels={'value': 'Taux de Succès (%)', 'Horizon': 'Horizon de Prédiction'},
-                     text=perf_by_horizon.apply(lambda x: f'{x:.1f}%'))
-        fig.update_layout(yaxis_range=[0, 100])
-        st.plotly_chart(fig, use_container_width=True)
+        if not completed.empty:
+            perf_by_horizon = completed.groupby('Horizon')['Direction Correcte'].mean().mul(100).sort_index()
+            fig = px.bar(perf_by_horizon, title="Taux de Succès de la Direction par Horizon", labels={'value': 'Taux de Succès (%)', 'Horizon': 'Horizon'})
+            fig.update_layout(yaxis_range=[0, 100])
+            st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("Aucune prédiction n'a encore été évaluée. Cliquez sur le bouton de mise à jour si des prédictions sont échues.")
+        st.info("Aucune prédiction évaluée.")
 
     st.subheader("Historique Complet des Prédictions")
     st.dataframe(df_log.style.format({

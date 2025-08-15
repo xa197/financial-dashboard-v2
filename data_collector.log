@@ -1,0 +1,4 @@
+2025-08-15 19:22:00 - INFO - --- Démarrage du collecteur de données ---
+2025-08-15 19:22:09 - ERROR - 
+1 Failed download:
+2025-08-15 19:22:09 - ERROR - ['SQ']: YFPricesMissingError('possibly delisted; no price data found  (period=10y) (Yahoo error = "No data found, symbol may be delisted")')

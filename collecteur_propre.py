@@ -1,8 +1,12 @@
+# collecteur_propre.py (Version Chirurgicale Finale)
 
 import yfinance as yf
 import pandas as pd
 import os
 import logging
+import shutil
+
+print("--- EXÉCUTION DU COLLECTEUR CHIRURGICAL ---")
 
 # --- Configuration du Logging ---
 logging.basicConfig(
@@ -10,63 +14,55 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
-    filemode='w' # 'w' pour écraser le log à chaque lancement
+    filemode='w'
 )
 
 def get_all_tickers(file_path='tickers.txt'):
-    """Lit le fichier tickers.txt et retourne une liste propre de tickers."""
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             tickers = [line.strip().upper() for line in f if line.strip() and not line.startswith('[') and not line.startswith('#')]
         return tickers
     except FileNotFoundError:
-        logging.error(f"Le fichier de tickers '{file_path}' est introuvable.")
+        logging.error(f"Fichier '{file_path}' introuvable.")
         return []
 
 def main():
-    """Script principal pour télécharger et sauvegarder les données."""
     logging.info("--- Démarrage du collecteur de données ---")
     
     if os.path.exists('data'):
-        import shutil
+        print("Suppression de l'ancien dossier /data...")
         shutil.rmtree('data')
-        logging.info("Ancien dossier /data supprimé.")
     
     os.makedirs('data')
-    logging.info("Nouveau dossier /data créé.")
+    print("Création d'un nouveau dossier /data.")
 
     tickers_to_download = get_all_tickers()
     if not tickers_to_download:
-        logging.warning("Aucun ticker trouvé dans tickers.txt. Arrêt du script.")
+        print("Aucun ticker trouvé dans tickers.txt.")
         return
 
-    logging.info(f"{len(tickers_to_download)} tickers à traiter.")
+    print(f"{len(tickers_to_download)} tickers à traiter.")
     
-    success_count = 0
-    error_count = 0
-
     for ticker in tickers_to_download:
         try:
             data = yf.download(ticker, period="10y", interval="1d", progress=False)
             
+            # --- LA NOUVELLE LIGNE CHIRURGICALE ---
+            # Si les colonnes sont un MultiIndex, on extrait le PREMIER élément de chaque nom de colonne
+            if isinstance(data.columns, pd.MultiIndex):
+                data.columns = [col[0] for col in data.columns]
+            
             if data.empty:
-                logging.warning(f"Aucune donnée reçue pour {ticker}. Ignoré.")
-                error_count += 1
+                print(f"Aucune donnée pour {ticker}.")
                 continue
 
-            # La sauvegarde correcte qui inclut l'index 'Date' comme première colonne
             file_path = f"data/{ticker.upper()}.csv"
             data.to_csv(file_path)
-            
-            logging.info(f"OK - Données pour {ticker} sauvegardées.")
-            success_count += 1
-
+            print(f"OK - Données pour {ticker} sauvegardées.")
         except Exception as e:
-            logging.error(f"ERREUR - Échec pour {ticker}: {e}")
-            error_count += 1
+            print(f"ERREUR pour {ticker}: {e}")
 
-    logging.info("--- Fin du cycle de collecte ---")
-    logging.info(f"Résumé : {success_count} succès, {error_count} échecs.")
+    print("--- COLLECTE TERMINÉE ---")
 
 if __name__ == "__main__":
     main()

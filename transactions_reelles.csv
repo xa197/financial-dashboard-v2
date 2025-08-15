@@ -1,1 +1,2 @@
-Date,Ticker,Montant_Achat,Prix_Achat,Quantite
+Date,Ticker,Montant_Achat,Prix_Achat,Quantite,Montant_Investi,Devise,Montant_USD,Prix_Achat_USD
+2025-08-15,AAPL,,,4.323763426487511e-05,0.01,USD,0.01,231.27999877929688
