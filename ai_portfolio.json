@@ -1,0 +1,25 @@
+{
+    "capital_disponible_eur": 7500.0,
+    "positions_ouvertes": [
+        {
+            "date_achat": "2025-08-15T20:51:15.168369",
+            "Ticker": "ABT",
+            "montant_investi_eur": 2500.0,
+            "prix_achat_usd": 131.57699584960938,
+            "prix_pic_usd": 131.57699584960938,
+            "quantite": 22.24075926617442
+        }
+    ],
+    "historique_transactions": [
+        {
+            "date_achat": "2025-08-15T20:51:15.168369",
+            "Ticker": "ABT",
+            "montant_investi_eur": 2500.0,
+            "prix_achat_usd": 131.57699584960938,
+            "prix_pic_usd": 131.57699584960938,
+            "quantite": 22.24075926617442,
+            "type": "ACHAT",
+            "date_transaction": "2025-08-15T20:51:15.168375"
+        }
+    ]
+}

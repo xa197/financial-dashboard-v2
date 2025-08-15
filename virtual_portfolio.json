@@ -1,0 +1,107 @@
+{
+    "capital_disponible_eur": 9500.0,
+    "positions_ouvertes": [
+        {
+            "Date Achat": "2025-08-15T20:24:26.124458",
+            "Ticker": "AMAT",
+            "Montant Investi EUR": 100.0,
+            "Prix Achat USD": 162.3300018310547,
+            "Prix Pic USD": 162.3300018310547,
+            "Quantite": 0.7212610632799356,
+            "Taux EURUSD Achat": 1.170823097229004
+        },
+        {
+            "Date Achat": "2025-08-15T20:25:07.690857",
+            "Ticker": "IBM",
+            "Montant Investi EUR": 100.0,
+            "Prix Achat USD": 240.15130615234372,
+            "Prix Pic USD": 240.15130615234372,
+            "Quantite": 0.48753559411676656,
+            "Taux EURUSD Achat": 1.170823097229004
+        },
+        {
+            "Date Achat": "2025-08-15T20:54:49.579756",
+            "Ticker": "COIN",
+            "Montant Investi EUR": 100.0,
+            "Prix Achat USD": 320.0299987792969,
+            "Prix Pic USD": 320.0299987792969,
+            "Quantite": 0.3657622473917784,
+            "Taux EURUSD Achat": 1.170548915863037
+        },
+        {
+            "Date Achat": "2025-08-15T20:55:48.328100",
+            "Ticker": "ABT",
+            "Montant Investi EUR": 100.0,
+            "Prix Achat USD": 131.57699584960938,
+            "Prix Pic USD": 131.57699584960938,
+            "Quantite": 0.8896303706469768,
+            "Taux EURUSD Achat": 1.170548915863037
+        },
+        {
+            "Date Achat": "2025-08-15T20:56:23.300917",
+            "Ticker": "ABT",
+            "Montant Investi EUR": 100.0,
+            "Prix Achat USD": 131.57699584960938,
+            "Prix Pic USD": 131.57699584960938,
+            "Quantite": 0.8896303706469768,
+            "Taux EURUSD Achat": 1.170548915863037
+        }
+    ],
+    "historique_transactions": [
+        {
+            "Date Achat": "2025-08-15T20:24:26.124458",
+            "Ticker": "AMAT",
+            "Montant Investi EUR": 100.0,
+            "Prix Achat USD": 162.3300018310547,
+            "Prix Pic USD": 162.3300018310547,
+            "Quantite": 0.7212610632799356,
+            "Taux EURUSD Achat": 1.170823097229004,
+            "Type": "ACHAT",
+            "Date Transaction": "2025-08-15T20:24:26.124462"
+        },
+        {
+            "Date Achat": "2025-08-15T20:25:07.690857",
+            "Ticker": "IBM",
+            "Montant Investi EUR": 100.0,
+            "Prix Achat USD": 240.15130615234372,
+            "Prix Pic USD": 240.15130615234372,
+            "Quantite": 0.48753559411676656,
+            "Taux EURUSD Achat": 1.170823097229004,
+            "Type": "ACHAT",
+            "Date Transaction": "2025-08-15T20:25:07.690862"
+        },
+        {
+            "Date Achat": "2025-08-15T20:54:49.579756",
+            "Ticker": "COIN",
+            "Montant Investi EUR": 100.0,
+            "Prix Achat USD": 320.0299987792969,
+            "Prix Pic USD": 320.0299987792969,
+            "Quantite": 0.3657622473917784,
+            "Taux EURUSD Achat": 1.170548915863037,
+            "Type": "ACHAT",
+            "Date Transaction": "2025-08-15T20:54:49.579762"
+        },
+        {
+            "Date Achat": "2025-08-15T20:55:48.328100",
+            "Ticker": "ABT",
+            "Montant Investi EUR": 100.0,
+            "Prix Achat USD": 131.57699584960938,
+            "Prix Pic USD": 131.57699584960938,
+            "Quantite": 0.8896303706469768,
+            "Taux EURUSD Achat": 1.170548915863037,
+            "Type": "ACHAT",
+            "Date Transaction": "2025-08-15T20:55:48.328107"
+        },
+        {
+            "Date Achat": "2025-08-15T20:56:23.300917",
+            "Ticker": "ABT",
+            "Montant Investi EUR": 100.0,
+            "Prix Achat USD": 131.57699584960938,
+            "Prix Pic USD": 131.57699584960938,
+            "Quantite": 0.8896303706469768,
+            "Taux EURUSD Achat": 1.170548915863037,
+            "Type": "ACHAT",
+            "Date Transaction": "2025-08-15T20:56:23.300921"
+        }
+    ]
+}

@@ -1,13 +1,16 @@
+# pages/5_🧠_Générateur_de_Prédictions.py (Version avec Achat Direct)
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import xgboost as xgb
 import yfinance as yf
-from utils import get_tickers_by_category
+from utils import get_tickers_by_category, add_virtual_transaction # NOUVEAUTÉ: Import de la fonction d'achat
 import os
 from datetime import datetime
 import pandas_ta as ta
 
+# ... (Tout le code de configuration et les fonctions de prédiction restent exactement les mêmes) ...
 # --- Configuration et Constantes ---
 st.set_page_config(layout="wide", page_title="Prédictions IA")
 PREDICTIONS_LOG_FILE = "predictions_log.csv"
@@ -18,13 +21,11 @@ LOG_COLUMNS = [
     "Statut", "SPY_RSI_au_lancement", "VIX_au_lancement"
 ]
 
-# --- Fonctions de Traitement (inchangées) ---
 @st.cache_data(ttl=1800)
 def get_hourly_data(ticker):
     try:
         data = yf.download(ticker, period="60d", interval="1h", progress=False)
-        if isinstance(data.columns, pd.MultiIndex):
-            data.columns = [col[0] for col in data.columns]
+        if isinstance(data.columns, pd.MultiIndex): data.columns = [col[0] for col in data.columns]
         if data.empty: return pd.DataFrame()
         if not isinstance(data.index, pd.DatetimeIndex): data.index = pd.to_datetime(data.index)
         return data
@@ -56,9 +57,7 @@ def get_market_context():
         return spy_rsi, vix_value
     except Exception: return np.nan, np.nan
 
-# --- NOUVEAUTÉ : Fonctions de gestion des logs modifiées ---
 def create_log_entry(timestamp, ticker, horizon_label, predicted_price, current_price):
-    """Prépare un dictionnaire pour le log, SANS écrire dans le fichier."""
     spy_rsi, vix_value = get_market_context()
     target_date = timestamp + pd.Timedelta(hours=HORIZONS[horizon_label])
     return {
@@ -69,7 +68,6 @@ def create_log_entry(timestamp, ticker, horizon_label, predicted_price, current_
     }
 
 def append_logs_to_file(log_entries):
-    """Ajoute une liste d'entrées de log au fichier CSV."""
     if not log_entries: return
     df_new_logs = pd.DataFrame(log_entries)
     try:
@@ -77,22 +75,16 @@ def append_logs_to_file(log_entries):
             df_new_logs.to_csv(PREDICTIONS_LOG_FILE, index=False)
         else:
             df_new_logs.to_csv(PREDICTIONS_LOG_FILE, mode='a', header=False, index=False)
-        st.success(f"{len(log_entries)} prédictions ont été enregistrées avec succès !")
+        st.success(f"{len(log_entries)} prédictions enregistrées !")
     except Exception as e:
-        st.error(f"Erreur lors de l'écriture dans le log : {e}")
+        st.error(f"Erreur d'écriture dans le log : {e}")
 
-# --- NOUVEAUTÉ : Initialisation de l'état de la session ---
-if 'ai_scan_results' not in st.session_state:
-    st.session_state.ai_scan_results = None
-if 'ai_log_entries' not in st.session_state:
-    st.session_state.ai_log_entries = []
+if 'ai_scan_results' not in st.session_state: st.session_state.ai_scan_results = None
+if 'ai_log_entries' not in st.session_state: st.session_state.ai_log_entries = []
 
-# --- Interface Streamlit ---
 st.title("🧠 Générateur de Prédictions par IA (XGBoost)")
 
-# --- NOUVEAUTÉ : Logique d'affichage conditionnelle ---
 if st.session_state.ai_scan_results is not None:
-    # --- AFFICHER LES RÉSULTATS EXISTANTS ---
     st.subheader("Derniers Résultats du Scan")
     df_results = st.session_state.ai_scan_results
     format_dict = {'Prix Actuel': '${:,.2f}'}; [format_dict.update({col: '{:+.2f}%'}) for col in df_results.columns if col not in ['Actif', 'Prix Actuel']]
@@ -100,22 +92,48 @@ if st.session_state.ai_scan_results is not None:
     
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("✅ Envoyer au Suivi de Performance", help="Enregistre ces prédictions dans le fichier de log pour le suivi."):
+        if st.button("✅ Envoyer au Suivi de Performance"):
             append_logs_to_file(st.session_state.ai_log_entries)
-            st.session_state.ai_log_entries = [] # On vide pour éviter les doublons
+            st.session_state.ai_log_entries = []
             st.toast("Prédictions enregistrées !")
             
     with col2:
-        if st.button("🔄 Lancer un nouveau scan", help="Efface les résultats actuels et permet de relancer un nouveau calcul."):
+        if st.button("🔄 Lancer un nouveau scan"):
             st.session_state.ai_scan_results = None
             st.session_state.ai_log_entries = []
             st.rerun()
 
+    # --- NOUVEAUTÉ : La section pour agir ---
+    st.markdown("---")
+    st.subheader("⚡️ Agir sur une Prédiction")
+    
+    # On propose les tickers avec les meilleures prédictions à court terme
+    short_term_horizon = "Court Terme (2h)"
+    if short_term_horizon in df_results.columns:
+        best_tickers = df_results.sort_values(by=short_term_horizon, ascending=False)['Actif'].tolist()
+    else:
+        best_tickers = df_results['Actif'].tolist()
+        
+    col_act, col_montant, col_btn = st.columns([2, 1, 1])
+    
+    with col_act:
+        selected_ticker = st.selectbox("Choisir un actif à acheter", options=best_tickers)
+    with col_montant:
+        investment_amount = st.number_input("Montant (€)", min_value=10.0, step=10.0, value=100.0)
+    with col_btn:
+        st.write("‎") # Pour aligner le bouton verticalement
+        if st.button("Acheter (Port. Virtuel)"):
+            if selected_ticker and investment_amount > 0:
+                success, message = add_virtual_transaction(selected_ticker, investment_amount)
+                if success:
+                    st.success(message + " [Voir le portefeuille](/Portefeuille_Virtuel)")
+                else:
+                    st.error(message)
+
 else:
-    # --- AFFICHER L'INTERFACE DE SCAN ---
+    # --- Interface de scan (inchangée) ---
     st.info("Sélectionnez un secteur et lancez le scan pour générer des prédictions.")
     tickers_by_category = get_tickers_by_category()
-
     if not tickers_by_category or "ERREUR" in tickers_by_category:
         st.error("Impossible de lire les catégories depuis `tickers.txt`.")
     else:
@@ -124,36 +142,27 @@ else:
             with category_tabs[i]:
                 st.subheader(f"Actifs du secteur : {category}")
                 tickers_in_category = tickers_by_category[category]
-                
                 if st.button(f"🚀 Lancer les prédictions pour {category}", key=f"scan_{category}"):
                     with st.spinner(f"Scan en cours pour le secteur {category}..."):
                         prediction_time = datetime.now()
-                        all_results = []
-                        log_entries_to_save = [] # Liste temporaire
+                        all_results, log_entries_to_save = [], []
                         progress_bar = st.progress(0, text="Initialisation...")
-
                         for j, ticker in enumerate(tickers_in_category):
                             progress_bar.progress((j + 1) / len(tickers_in_category), text=f"Analyse de {ticker}...")
                             hourly_data = get_hourly_data(ticker)
                             if hourly_data.empty: continue
-
                             current_price = hourly_data['Close'].iloc[-1]
                             result_row = {"Actif": ticker, "Prix Actuel": current_price}
-
                             for horizon_label, horizon_h in HORIZONS.items():
                                 predicted_price = train_predict_model(hourly_data, horizon_h)
                                 if predicted_price is not None:
                                     change_pct = ((predicted_price - current_price) / current_price) * 100
                                     result_row[horizon_label] = change_pct
-                                    # On prépare l'entrée de log
                                     log_entries_to_save.append(create_log_entry(prediction_time, ticker, horizon_label, predicted_price, current_price))
                                 else:
                                     result_row[horizon_label] = np.nan
                             all_results.append(result_row)
-                        
                         progress_bar.empty()
-
-                    # On sauvegarde les résultats dans l'état de la session
                     st.session_state.ai_scan_results = pd.DataFrame(all_results)
                     st.session_state.ai_log_entries = log_entries_to_save
                     st.rerun()
